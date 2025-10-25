@@ -12,6 +12,9 @@ import { MedicalRecordsModule } from './medical-records/medical-records.module';
 import { Prescription } from '@/prescriptions/entities/prescription.entity';
 import { PrescriptionItem } from '@/prescription-items/entities/prescription-item.entity';
 import { MedicinesModule } from './medicines/medicines.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { Specialty } from '@/specialties/entities/specialty.entity';
+import { SpecialtiesModule } from '@/specialties/specialties.module';
 
 @Module({
   imports: [
@@ -26,7 +29,7 @@ import { MedicinesModule } from './medicines/medicines.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [User, Appointment, Medicine, MedicalRecord, Prescription, PrescriptionItem],
+        entities: [User, Appointment, Medicine, MedicalRecord, Prescription, PrescriptionItem, Specialty],
         synchronize: true,
       }),
     }),
@@ -37,6 +40,8 @@ import { MedicinesModule } from './medicines/medicines.module';
     AppointmentsModule,
     MedicalRecordsModule,
     MedicinesModule,
+    DashboardModule,
+    SpecialtiesModule,
   ],
 })
 export class AppModule {}
