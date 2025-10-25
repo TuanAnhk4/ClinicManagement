@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, BeforeInsert } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, BeforeInsert, OneToMany } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { Appointment } from '@/appointments/entities/appointment.entity';
 
 // Định nghĩa các vai trò người dùng có thể có trong hệ thống
 export enum UserRole {
@@ -31,6 +32,12 @@ export class User {
     default: UserRole.PATIENT, // Mặc định khi tạo mới sẽ là Bệnh nhân
   })
   role: UserRole;
+
+  @OneToMany(() => Appointment, (appointment) => appointment.patient)
+  appointmentsAsPatient: Appointment[];
+
+  @OneToMany(() => Appointment, (appointment) => appointment.doctor)
+  appointmentsAsDoctor: Appointment[];
 
   // Đây là một "hook" của TypeORM.
   // Nó sẽ tự động chạy hàm này TRƯỚC KHI một user mới được chèn vào database.

@@ -4,7 +4,7 @@ import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginResponseDto } from './dtos/login-response.dto';
-import { UserResponseDto } from '@users/dtos/user-response.dto';
+import { UserResponseDto } from '@/users/dtos/user-response.dto';
 
 // Thêm vào đầu file src/auth/auth.controller.ts
 interface UserPayload {
