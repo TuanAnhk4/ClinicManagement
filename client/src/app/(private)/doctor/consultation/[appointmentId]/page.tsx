@@ -48,7 +48,7 @@ export default function ConsultationPage() {
   // 3. Định nghĩa hàm callback khi form submit thành công
   const handleFormSubmitSuccess = () => {
     // Chuyển hướng về Dashboard sau khi lưu thành công
-    router.push('/dashboard');
+    router.push('/doctor/dashboard');
   };
 
   if (loading) return <div className="p-6">Đang tải thông tin...</div>;
