@@ -126,7 +126,7 @@ export default function DoctorDashboardPage() {
                
                {app.status === 'CONFIRMED' && (
                  <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                 onClick={() => router.push(`/consultation/${app.id}`)}>
+                 onClick={() => router.push(`/doctor/consultation/${app.id}`)}>
                    Bắt đầu khám
                  </button>
                )}
