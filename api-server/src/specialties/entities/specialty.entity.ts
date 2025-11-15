@@ -1,7 +1,7 @@
 import { User } from 'src/users/entities/user.entity';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 
-@Entity('specialties') // Tên bảng trong database
+@Entity('specialties')
 export class Specialty {
   @PrimaryGeneratedColumn()
   id: number;
@@ -15,4 +15,7 @@ export class Specialty {
   // Một chuyên khoa có thể có nhiều bác sĩ
   @OneToMany(() => User, (user) => user.specialty)
   doctors: User[];
+
+  @Column({ type: 'decimal', precision: 10, scale: 0, default: 0 })
+  base_cost: number;
 }

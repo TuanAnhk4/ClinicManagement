@@ -5,4 +5,6 @@ export class Medicine {
   @Column({ unique: true }) name: string;
   @Column() unit: string; // Ví dụ: 'viên', 'chai', 'ống'
   @Column({ type: 'text', nullable: true }) description: string;
+  @Column({ type: 'decimal', precision: 10, scale: 0, default: 0 })
+  price: number;
 }
