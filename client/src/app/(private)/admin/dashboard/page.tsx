@@ -8,6 +8,13 @@ import { DailyAppointmentsChart } from '@/components/charts/DailyAppointmentsCha
 import { TopDiagnosesChart } from '@/components/charts/TopDiagnosesChart';
 import { SpecialtyDistributionChart } from '@/components/charts/SpecialtyDistributionChart';
 
+interface ForecastData {
+  ds: string;
+  yhat: number;
+  yhat_lower: number;
+  yhat_upper: number;
+}
+
 // Định nghĩa kiểu dữ liệu cho state
 interface DashboardData {
   dailyAppointments: { date: string; count: number }[];
@@ -16,11 +23,17 @@ interface DashboardData {
   specialtyDistribution: { specialty: string; count: number }[];
 }
 
+interface PeakTimeData {
+  peak_hour: string;
+  peak_day: string;
+}
+
 export default function AdminDashboardPage() {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -29,7 +42,7 @@ export default function AdminDashboardPage() {
         setError('');
         try {
           // Gọi đồng thời tất cả API bằng Promise.all
-          const [dailyRes, monthlyRes, diagnosesRes, specialtyRes] = await Promise.all([
+          const [dailyRes, monthlyRes, diagnosesRes, specialtyRes,] = await Promise.all([
             api.get('/dashboard/daily-appointments'),
             api.get('/dashboard/monthly-appointments'), // Vẫn gọi để có dữ liệu nếu muốn thêm sau
             api.get('/dashboard/top-diagnoses'),
@@ -89,7 +102,6 @@ export default function AdminDashboardPage() {
         <TopDiagnosesChart data={data.topDiagnoses} />
       </Card>
 
-      {/* Thêm các biểu đồ khác (ví dụ: tháng, doanh thu) nếu cần */}
     </div>
   );
 }

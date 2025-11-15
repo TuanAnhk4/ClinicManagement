@@ -13,4 +13,7 @@ export class MedicalRecord {
 
   @OneToOne(() => Prescription, (prescription) => prescription.medicalRecord) // Chỉ định quan hệ ngược lại
   prescription: Prescription;
+
+  @Column({ type: 'decimal', precision: 10, scale: 0, nullable: true })
+  total_cost: number;
 }

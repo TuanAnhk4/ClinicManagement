@@ -1,6 +1,6 @@
 # Phân Tích Thời Điểm Cao Điểm
 
-## 1. Mục Đích 🎯
+### 1. Mục Đích
 
 Chức năng này dùng để phân tích dữ liệu lịch sử nhằm tìm ra **thời điểm cao điểm** (bận rộn nhất) của phòng khám.
 

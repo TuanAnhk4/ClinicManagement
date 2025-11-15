@@ -24,62 +24,83 @@ export class MedicalRecordsService {
   async create(createDto: CreateMedicalRecordDto): Promise<MedicalRecord> {
     const { appointmentId, diagnosis, symptoms, notes, prescriptionItems } = createDto;
 
-    // Sử dụng transaction để đảm bảo tất cả các bước thành công hoặc thất bại cùng lúc
-    return this.entityManager.transaction(async (transactionalEntityManager) => {
+    // Bắt đầu một transaction
+    return this.entityManager.transaction(async (transactionManager) => {
       // --- BÊN TRONG TRANSACTION ---
 
-      // 1. Kiểm tra Appointment tồn tại và chưa hoàn thành
-      const appointment = await transactionalEntityManager.findOne(Appointment, {
+      // 1. Kiểm tra Appointment và lấy thông tin BS, Chuyên Khoa
+      const appointment = await transactionManager.findOne(Appointment, {
         where: { id: appointmentId },
+        relations: [
+          'doctor', // Cần thông tin bác sĩ
+          'doctor.specialty', // Cần chuyên khoa của bác sĩ để lấy phí khám
+        ],
       });
+
       if (!appointment) {
         throw new NotFoundException(`Không tìm thấy lịch hẹn với ID ${appointmentId}`);
       }
       if (appointment.status !== AppointmentStatus.CONFIRMED) {
         throw new BadRequestException('Lịch hẹn này không ở trạng thái có thể khám.');
       }
+      // Lấy phí khám cơ bản từ chuyên khoa của bác sĩ
+      const base_cost = appointment.doctor?.specialty?.base_cost || 0;
+      let total_medicine_cost = 0; // Biến tạm để tính tổng tiền thuốc
 
-      // 2. Tạo Medical Record
-      const medicalRecord = transactionalEntityManager.create(MedicalRecord, {
+      // 2. Tạo Medical Record (chưa có total_cost)
+      const medicalRecord = transactionManager.create(MedicalRecord, {
         diagnosis,
         symptoms,
         notes,
         appointment,
       });
-      const savedMedicalRecord = await transactionalEntityManager.save(medicalRecord);
+      // Lưu lại để lấy ID
+      const savedMedicalRecord = await transactionManager.save(medicalRecord);
 
       // 3. Xử lý đơn thuốc (nếu có)
       if (prescriptionItems && prescriptionItems.length > 0) {
         // Tạo Prescription
-        const prescription = transactionalEntityManager.create(Prescription, {
+        const prescription = transactionManager.create(Prescription, {
           medicalRecord: savedMedicalRecord,
         });
-        const savedPrescription = await transactionalEntityManager.save(prescription);
+        const savedPrescription = await transactionManager.save(prescription);
 
         // Tạo các Prescription Items
         for (const itemDto of prescriptionItems) {
-          // Kiểm tra Medicine tồn tại
-          const medicine = await this.medicineRepository.findOneBy({ id: itemDto.medicineId });
+          // Kiểm tra Medicine tồn tại và lấy giá
+          const medicine = await transactionManager.findOne(Medicine, {
+            where: { id: itemDto.medicineId },
+          });
           if (!medicine) {
             throw new NotFoundException(`Không tìm thấy thuốc với ID ${itemDto.medicineId}`);
           }
 
-          const prescriptionItem = transactionalEntityManager.create(PrescriptionItem, {
+          // Cộng dồn tiền thuốc
+          total_medicine_cost += medicine.price * itemDto.quantity;
+
+          const prescriptionItem = transactionManager.create(PrescriptionItem, {
             quantity: itemDto.quantity,
             dosage: itemDto.dosage,
             prescription: savedPrescription,
             medicine: medicine,
           });
-          await transactionalEntityManager.save(prescriptionItem);
+          await transactionManager.save(prescriptionItem);
         }
       }
 
-      // 4. Cập nhật trạng thái Appointment thành COMPLETED
+      // 4. Tính toán và Cập nhật Tổng Chi Phí
+      const total_cost = base_cost + total_medicine_cost;
+      savedMedicalRecord.total_cost = total_cost;
+
+      // Lưu lại medical record với thông tin total_cost
+      const finalMedicalRecord = await transactionManager.save(savedMedicalRecord);
+
+      // 5. Cập nhật trạng thái Appointment thành COMPLETED
       appointment.status = AppointmentStatus.COMPLETED;
-      await transactionalEntityManager.save(appointment);
+      await transactionManager.save(appointment);
 
       // --- KẾT THÚC TRANSACTION ---
-      return savedMedicalRecord; // Trả về Medical Record đã tạo
+      return finalMedicalRecord; // Trả về Medical Record đã hoàn chỉnh
     });
   }
   async findAllForPatient(patientId: number): Promise<MedicalRecord[]> {
@@ -91,16 +112,15 @@ export class MedicalRecordsService {
   }
 
   async findByAppointmentId(appointmentId: number): Promise<MedicalRecord> {
-    const record = await this.medicalRecordRepository.findOne({
+    const record = await this.entityManager.findOne(MedicalRecord, {
       where: { appointment: { id: appointmentId } },
-      // Lấy kèm các thông tin liên quan nếu cần, ví dụ đơn thuốc
-      // relations: ['appointment', 'prescription', 'prescription.items', 'prescription.items.medicine'],
       relations: [
         'appointment',
         'appointment.doctor',
-        'prescription', // Lấy thông tin đơn thuốc
-        'prescription.items', // Lấy các mục trong đơn thuốc
-        'prescription.items.medicine', // Lấy thông tin chi tiết của từng loại thuốc
+        'appointment.doctor.specialty', // Lấy chuyên khoa
+        'prescription', // Lấy đơn thuốc
+        'prescription.items', // Lấy các mục trong đơn
+        'prescription.items.medicine', // Lấy thông tin chi tiết từng loại thuốc
       ],
     });
 
@@ -109,6 +129,4 @@ export class MedicalRecordsService {
     }
     return record;
   }
-
-  // Thêm các hàm khác (ví dụ: getByAppointmentId) vào đây nếu cần
 }

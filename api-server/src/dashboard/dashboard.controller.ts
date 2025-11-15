@@ -5,7 +5,6 @@ import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/users/entities/user.entity';
 import { RolesGuard } from 'src/auth/roles.guard';
 
-// Định nghĩa kiểu dữ liệu trả về cho các endpoint (nên đặt ở file types chung nếu dùng ở nhiều nơi)
 interface CountByTimeResponse {
   date?: string; // Dùng cho daily
   month?: string; // Dùng cho monthly

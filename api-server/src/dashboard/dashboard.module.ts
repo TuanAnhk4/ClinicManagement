@@ -6,6 +6,7 @@ import { Appointment } from 'src/appointments/entities/appointment.entity'; // I
 import { MedicalRecord } from 'src/medical-records/entities/medical-record.entity'; // Import MedicalRecord
 import { User } from 'src/users/entities/user.entity'; // Import User (để lấy chuyên khoa)
 import { UsersModule } from 'src/users/users.module'; // Import UsersModule
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UsersModule } from 'src/users/users.module'; // Import UsersModule
       // Thêm các Entity khác nếu bạn cần thống kê từ chúng
     ]),
     UsersModule, // Import UsersModule nếu DashboardService cần dùng UsersService
+    HttpModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

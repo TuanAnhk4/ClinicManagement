@@ -5,7 +5,6 @@ import { Appointment, AppointmentStatus } from 'src/appointments/entities/appoin
 import { MedicalRecord } from 'src/medical-records/entities/medical-record.entity';
 import { User, UserRole } from 'src/users/entities/user.entity';
 
-// Định nghĩa interface cho kết quả truy vấn thô để tránh lỗi 'any'
 interface DailyCountResult {
   date: string; // DATE() trả về string
   count: string; // COUNT() trả về string
