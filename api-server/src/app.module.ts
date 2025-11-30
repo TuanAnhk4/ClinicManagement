@@ -1,20 +1,27 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthModule } from '@/auth/auth.module';
-import { UsersModule } from '@/users/users.module';
-import { User } from '@/users/entities/user.entity'; // Import User Entity
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AppointmentsModule } from '@/appointments/appointments.module';
-import { Appointment } from '@/appointments/entities/appointment.entity';
-import { Medicine } from '@/medicines/entities/medicine.entity';
-import { MedicalRecord } from '@/medical-records/entities/medical-record.entity';
-import { MedicalRecordsModule } from './medical-records/medical-records.module';
-import { Prescription } from '@/prescriptions/entities/prescription.entity';
-import { PrescriptionItem } from '@/prescription-items/entities/prescription-item.entity';
-import { MedicinesModule } from './medicines/medicines.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { Specialty } from '@/specialties/entities/specialty.entity';
-import { SpecialtiesModule } from '@/specialties/specialties.module';
+
+import { AuthModule } from '@modules/auth/auth.module';
+import { UsersModule } from '@modules/users/users.module';
+import { AppointmentsModule } from '@modules/appointments/appointments.module';
+import { MedicalRecordsModule } from '@modules/medical-records/medical-records.module';
+import { MedicinesModule } from '@modules/medicines/medicines.module';
+import { DashboardModule } from '@modules/dashboard/dashboard.module';
+import { SpecialtiesModule } from '@modules/specialties/specialties.module';
+import { DoctorSchedulesModule } from '@modules/doctor-schedules/doctor-schedules.module';
+
+import { Appointment } from '@modules/appointments/entities';
+import { Medicine } from '@modules/medicines/entities';
+import { MedicalRecord } from '@modules/medical-records/entities';
+import { Prescription } from '@modules/prescriptions/entities';
+import { PrescriptionItem } from '@modules/prescription-items/entities';
+import { Specialty } from '@modules/specialties/entities';
+import { User } from '@modules/users/entities';
+import { DoctorSchedule } from '@modules/doctor-schedules/entities';
+
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from '@common/guards';
 
 @Module({
   imports: [
@@ -29,12 +36,20 @@ import { SpecialtiesModule } from '@/specialties/specialties.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [User, Appointment, Medicine, MedicalRecord, Prescription, PrescriptionItem, Specialty],
-        synchronize: true,
+        entities: [
+          User,
+          Appointment,
+          Medicine,
+          MedicalRecord,
+          Prescription,
+          PrescriptionItem,
+          Specialty,
+          DoctorSchedule,
+        ],
+        synchronize: true, //TypeORM auto update db tables
       }),
     }),
 
-    // 2. CÁC MODULE TÍNH NĂNG
     AuthModule,
     UsersModule,
     AppointmentsModule,
@@ -42,6 +57,14 @@ import { SpecialtiesModule } from '@/specialties/specialties.module';
     MedicinesModule,
     DashboardModule,
     SpecialtiesModule,
+    DoctorSchedulesModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard, // Kích hoạt bảo vệ toàn bộ ứng dụng
+    },
+    // ... các providers khác
   ],
 })
 export class AppModule {}

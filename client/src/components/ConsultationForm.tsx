@@ -55,10 +55,16 @@ export const ConsultationForm = ({ appointmentId, onSubmitSuccess }: Consultatio
     const fetchMedicines = async () => {
       try {
         const response = await api.get('/medicines'); // API lấy danh sách thuốc
-        const options = response.data.map((med: Medicine) => ({
-          value: med.id,
-          label: `${med.name} (${med.unit})`,
-        }));
+        const options = response.data.map((med: Medicine) => {
+          // Format giá tiền sang VND (ví dụ: 5.000 ₫)
+          const formattedPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(med.price);
+
+          return {
+            value: med.id,
+            // Hiển thị: Paracetamol (viên) - 5.000 ₫
+            label: `${med.name} (${med.unit}) - ${formattedPrice}`,
+          };
+        });
         setMedicines(options);
       } catch (error) {
         console.error("Không thể tải danh mục thuốc:", error);
@@ -75,9 +81,9 @@ export const ConsultationForm = ({ appointmentId, onSubmitSuccess }: Consultatio
 
     // Chuyển đổi dữ liệu đơn thuốc về đúng định dạng API yêu cầu
     const formattedPrescriptionItems = formData.prescriptionItems.map(item => ({
-        medicineId: item.medicineId?.value,
-        quantity: parseInt(String(item.quantity), 10), // Đảm bảo quantity là số
-        dosage: item.dosage,
+      medicineId: item.medicineId?.value,
+      quantity: parseInt(String(item.quantity), 10), // Đảm bảo quantity là số
+      dosage: item.dosage,
     })).filter(item => item.medicineId != null && !isNaN(item.quantity)); // Lọc bỏ dòng lỗi
 
     const payload = {
@@ -171,7 +177,7 @@ export const ConsultationForm = ({ appointmentId, onSubmitSuccess }: Consultatio
                       control: (base) => ({
                         ...base,
                         borderColor: errors.prescriptionItems?.[index]?.medicineId ? 'red' : base.borderColor,
-                       }),
+                      }),
                     }}
                   />
                 )}
