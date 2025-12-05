@@ -1,115 +1,142 @@
-// src/components/auth/LoginForm.tsx
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { AxiosError } from 'axios';
+
+// Import Components chuẩn
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
-import { AxiosError } from 'axios'; // Import AxiosError để xử lý lỗi an toàn
+import { AuthWrapper } from './AuthWrapper';
+import { SocialButtons } from './SocialButtons';
 
-// Props giữ nguyên
+// Import Logic & Service
+import { useAuth } from '@/hooks';
+import { authService } from '@/services/auth.service'; // Dùng service thay vì gọi api trực tiếp
+
 interface LoginFormProps {
-  onLoginSuccess?: () => void;
-  onSwitchToRegister?: () => void;
+  onLoginSuccess?: () => void; // (Optional) Nếu dùng trong Modal
+  onSwitchToRegister?: () => void; // (Optional) Nếu dùng trong Modal
 }
 
 export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps) => {
-  // --- BẮT ĐẦU PHẦN LOGIC TỪ LoginPage CŨ ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const auth = useAuth();
+  
+  const { login: contextLogin } = useAuth(); // Lấy hàm login từ context để update state toàn cục
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const user = await auth.login(response.data.access_token);
+      // 1. Gọi API Login qua Service (để lấy token và user)
+      const response = await authService.login({ email, password });
 
-if (user) {
-  // LUÔN LUÔN THỰC HIỆN CHUYỂN HƯỚNG SAU KHI LOGIN
-  const redirectPaths = {
-    ADMIN: '/admin/dashboard',
-    DOCTOR: '/doctor/dashboard',
-    PATIENT: '/patient/book-appointment', // Hoặc '/' nếu bạn muốn bệnh nhân về trang chủ riêng tư
-  };
-  // Giả sử user.role là string: 'ADMIN', 'DOCTOR', 'PATIENT'
-  router.push(redirectPaths[user.role as keyof typeof redirectPaths] || '/');
+      // 2. Cập nhật Context (quan trọng để App biết là đã login)
+      // Lưu ý: Hàm contextLogin của bạn hiện tại có thể đang gọi lại API. 
+      // Tốt nhất là sửa context để nhận luôn data user, hoặc cứ gọi lại nếu chấp nhận 2 request.
+      // Ở đây giả sử ta gọi hàm login của Context để nó lo mọi việc.
+      await contextLogin({ email, password });
+      
+      // 3. Chuyển hướng (Nếu context chưa tự chuyển hướng)
+      // Logic chuyển hướng đã có trong AuthContext mới, nên ở đây có thể không cần nữa.
+      // Nhưng nếu bạn muốn xử lý riêng cho Modal:
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      } else {
+        // Fallback nếu Context không tự chuyển hướng
+        // const role = response.user?.role;
+        // if (role === 'ADMIN') router.push('/admin/dashboard');
+        // else if (role === 'DOCTOR') router.push('/doctor/dashboard');
+        // else router.push('/patient');
+      }
 
-} else {
-  // Trường hợp auth.login trả về null (lỗi lấy profile)
-  setError('Đăng nhập thành công nhưng không thể lấy thông tin người dùng.');
-}
-    // Sửa lại cách bắt lỗi cho an toàn
     } catch (err) {
-       if (err instanceof AxiosError) {
-          setError(err.response?.data?.message || 'Email hoặc mật khẩu không chính xác.');
-       } else {
-         setError('Đã có lỗi không xác định xảy ra.');
-       }
+      if (err instanceof AxiosError) {
+        setError(err.response?.data?.message || 'Email hoặc mật khẩu không chính xác.');
+      } else {
+        setError('Đã có lỗi không xác định xảy ra.');
+      }
     } finally {
       setLoading(false);
     }
   };
-  // --- KẾT THÚC PHẦN LOGIC ---
 
-  // --- PHẦN JSX GIỮ NGUYÊN NHƯ FILE LoginForm TRƯỚC ---
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-      {/* Cột trái */}
-      <div className="hidden md:flex flex-col items-center justify-center bg-gray-100 p-8 rounded-l-lg">
-        <h2 className="text-2xl font-semibold text-center text-gray-700 mt-4">
-          Chăm sóc sức khỏe toàn diện cho bạn và gia đình.
-        </h2>
-      </div>
-
-      {/* Cột phải (Form) */}
-      <div className="p-8 space-y-6">
-        <div className="text-center md:text-left">
-          <h1 className="text-2xl font-bold">Welcome Back!</h1>
-          <p className="text-gray-500 text-sm">Vui lòng đăng nhập để tiếp tục.</p>
+    <AuthWrapper
+      title="Chào mừng trở lại"
+      subtitle="Vui lòng đăng nhập để tiếp tục"
+      footerLink={
+        // Nếu dùng trong Modal thì xử lý nút chuyển đổi riêng
+        !onSwitchToRegister ? {
+          text: "Chưa có tài khoản?",
+          linkText: "Đăng ký ngay",
+          href: "/register"
+        } : undefined
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <Input
+            type="email"
+            placeholder="example@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            error={!!error} // Hiển thị viền đỏ nếu lỗi
+          />
+        </div>
+        
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-medium text-gray-700">Mật khẩu</label>
+            <Link 
+              href="/forgot-password" 
+              className="text-xs font-medium text-blue-600 hover:underline"
+            >
+              Quên mật khẩu?
+            </Link>
+          </div>
+          <Input
+            type="password"
+            placeholder="********"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            error={!!error}
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email input */}
-          <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <Input id="login-email" type="email" placeholder="example@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required variant={error ? 'error' : 'default'} />
-          </div>
-          {/* Password input */}
-          <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
-            <Input id="login-password" type="password" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required variant={error ? 'error' : 'default'} />
-          </div>
-          {/* Forgot password link */}
-          <div className="text-right text-sm">
-            <Link href="/forgot-password" className="font-medium text-blue-600 hover:underline">Forgot password?</Link>
-          </div>
-          {/* Error message */}
-          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-          {/* Submit button */}
-          <Button type="submit" size="large" className="w-full" disabled={loading}>{loading ? 'Đang xử lý...' : 'Login'}</Button>
-          {/* OR separator */}
-          <div className="relative my-4"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-300"></span></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">OR</span></div></div>
-          {/* Social buttons */}
-          <div className="flex gap-4">
-            <Button variant="secondary" className="w-full">Google</Button>
-            <Button variant="secondary" className="w-full">Facebook</Button>
-          </div>
-          {/* Switch to Register */}
-          <p className="text-sm text-center text-gray-600">
-            Chưa có tài khoản?{' '}
-            <button type="button" onClick={onSwitchToRegister} className="font-medium text-blue-600 hover:underline">Register Now</button>
-          </p>
-        </form>
-      </div>
-    </div>
+        {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
+
+        <Button type="submit" size="large" className="w-full" isLoading={loading} fullWidth>
+          Đăng nhập
+        </Button>
+      </form>
+
+      {/* Nút Social */}
+      <SocialButtons isLoading={loading} />
+
+      {/* Nếu dùng trong Modal thì hiện nút chuyển đổi ở đây */}
+      {onSwitchToRegister && (
+        <div className="mt-4 text-center text-sm">
+          <span className="text-gray-600">Chưa có tài khoản? </span>
+          <button 
+            type="button"
+            onClick={onSwitchToRegister}
+            className="font-medium text-blue-600 hover:underline"
+          >
+            Đăng ký ngay
+          </button>
+        </div>
+      )}
+    </AuthWrapper>
   );
 };

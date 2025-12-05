@@ -1,47 +1,47 @@
-// src/app/(private)/patient/layout.tsx
 'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { PatientSidebar } from '@/components/layout/PatientSidebar'; // <-- 1. Import PatientSidebar
-import { UserRole } from '@/types';
 
-export default function PatientLayout({
+// Import Hooks & Types chuẩn
+import { useAuth } from '@/hooks'; 
+import { UserRole } from '@/types/enums';
+
+// Import UI Components chuẩn
+import { Spinner } from '@/components/ui/Spinner';
+import { PatientLayout } from '@/components/layout/patient/PatientLayout'; // <-- Dùng component này
+
+export default function PatientRootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated) {
-      router.replace('/login');
-      return;
+    // Lưu ý: PrivateLayout cha đã check isAuthenticated rồi.
+    // Ở đây ta chỉ cần check đúng Role là PATIENT thôi.
+    if (!loading) {
+      if (user?.role !== UserRole.PATIENT) {
+        // Nếu không phải bệnh nhân -> Đá về trang chủ (hoặc trang 403)
+        router.replace('/'); 
+      }
     }
-    if (user?.role !== UserRole.PATIENT) {
-      router.replace('/');
-    }
-  }, [isAuthenticated, user, authLoading, router]);
+  }, [user, loading, router]);
 
-  if (authLoading || !isAuthenticated || user?.role !== UserRole.PATIENT) {
+  // Màn hình chờ khi đang check quyền
+  if (loading || user?.role !== UserRole.PATIENT) {
     return (
-      <div className="flex items-center justify-center h-screen"><p>Đang kiểm tra quyền truy cập...</p></div>
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner size="large" variant="primary" />
+          <p className="text-sm text-gray-500 animate-pulse">Đang tải dữ liệu bệnh nhân...</p>
+        </div>
+      </div>
     );
   }
 
-  // --- 2. Render bố cục Sidebar + Body ---
-  return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      <PatientSidebar /> {/* <-- Sử dụng Sidebar Bệnh nhân */}
-      {/* Phần Nội dung chính */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto">
-        {/* Không cần Header ở đây theo yêu cầu của bạn */}
-        {children} {/* Nội dung của trang con sẽ hiển thị ở đây */}
-      </main>
-    </div>
-  );
-  // --- KẾT THÚC RENDER ---
+  // Render Layout chuẩn đã đóng gói
+  return <PatientLayout>{children}</PatientLayout>;
 }

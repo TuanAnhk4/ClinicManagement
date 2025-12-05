@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
 
-import { Roles } from '@common/decorators';
+import { Public, Roles } from '@common/decorators';
 import { RolesGuard, OwnerOrAdminGuard } from '@common/guards';
 
 import { UsersService } from './users.service';
@@ -18,7 +18,7 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR)
+  @Public()
   @Get()
   findAll(@Query('role') role?: UserRole) {
     return this.usersService.findAll(role);

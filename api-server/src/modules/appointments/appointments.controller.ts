@@ -58,4 +58,10 @@ export class AppointmentsController {
     const appointment = await this.appointmentsService.findOne(id, user);
     return AppointmentResponseDto.fromEntity(appointment);
   }
+
+  @Get()
+  @Roles(UserRole.ADMIN) // Chỉ Admin được xem tất cả
+  findAll() {
+    return this.appointmentsService.findAll();
+  }
 }
