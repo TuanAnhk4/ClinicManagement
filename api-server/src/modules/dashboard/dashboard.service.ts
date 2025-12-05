@@ -74,21 +74,22 @@ export class DashboardService {
 
     const results = await this.appointmentRepo
       .createQueryBuilder('appointment')
-      .leftJoin('appointment.medicalRecord', 'record')
+
+      .leftJoin(MedicalRecord, 'record', 'record.appointmentId = appointment.id')
       // PostgreSQL dùng TO_CHAR để format ngày
       .select("TO_CHAR(appointment.appointmentTime, 'YYYY-MM-DD')", 'date')
       .addSelect('COUNT(appointment.id)', 'count')
       .addSelect('SUM(record.total_cost)', 'revenue')
       .where('appointment.appointmentTime >= :startDate', { startDate: thirtyDaysAgo })
       .andWhere('appointment.status = :status', { status: AppointmentStatus.COMPLETED })
-      .groupBy('date')
+      .groupBy("TO_CHAR(appointment.appointmentTime, 'YYYY-MM-DD')")
       .orderBy('date', 'ASC')
       .getRawMany<DailyStatRaw>();
 
     return results.map((item) => ({
       date: item.date,
       count: Number(item.count),
-      revenue: Number(item.revenue || 0),
+      revenue: Number(item.revenue),
     }));
   }
 
@@ -118,6 +119,7 @@ export class DashboardService {
 
     const results = await this.medicalRecordRepo
       .createQueryBuilder('record')
+      .innerJoin('record.appointment', 'appointment')
       .select('record.diagnosis', 'diagnosis')
       .addSelect('COUNT(record.id)', 'count')
       .where('appointment.appointmentTime >= :startDate', { startDate: thirtyDaysAgo })

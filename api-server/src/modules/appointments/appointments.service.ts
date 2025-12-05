@@ -100,6 +100,16 @@ export class AppointmentsService {
     });
   }
 
+  async findAll(): Promise<Appointment[]> {
+    return this.appointmentsRepository.find({
+      // Lấy kèm thông tin Patient và Doctor để hiển thị tên trên bảng Admin
+      relations: ['patient', 'doctor'],
+
+      // Sắp xếp: Mới nhất lên đầu để Admin dễ theo dõi
+      order: { appointmentTime: 'DESC' },
+    });
+  }
+
   async cancel(id: number, currentUser: User): Promise<Appointment> {
     const appointment = await this.findOne(id, currentUser);
 

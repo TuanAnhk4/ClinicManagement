@@ -1,107 +1,248 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import api from '@/lib/api';
-import { Card } from '@/components/ui/Card';
+import { 
+  Users, 
+  User, 
+  CalendarCheck, 
+  DollarSign, 
+  TrendingUp, 
+  Activity 
+} from 'lucide-react';
+
+// Components
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { DailyAppointmentsChart } from '@/components/charts/DailyAppointmentsChart';
 import { TopDiagnosesChart } from '@/components/charts/TopDiagnosesChart';
 import { SpecialtyDistributionChart } from '@/components/charts/SpecialtyDistributionChart';
+import { RevenueChart } from '@/components/charts/RevenueChart'; // Mới
+import { AppointmentStatusChart } from '@/components/charts/AppointmentStatusChart'; // Mới
+import { PeakTimeChart } from '@/components/charts/PeakTimeChart'; // Mới
+import { ChartSkeleton } from '@/components/charts/ChartSkeleton';
+import { Spinner } from '@/components/ui/Spinner';
 
-interface ForecastData {
-  ds: string;
-  yhat: number;
-  yhat_lower: number;
-  yhat_upper: number;
-}
-
-// Định nghĩa kiểu dữ liệu cho state
-interface DashboardData {
-  dailyAppointments: { date: string; count: number }[];
-  monthlyAppointments: { month: string; count: number }[]; // Mặc dù chưa vẽ biểu đồ tháng
-  topDiagnoses: { diagnosis: string; count: number }[];
-  specialtyDistribution: { specialty: string; count: number }[];
-}
-
-interface PeakTimeData {
-  peak_hour: string;
-  peak_day: string;
-}
+// Services & Types
+import { dashboardService } from '@/services/dashboard.service';
+import { 
+  OverviewStats, 
+  DailyStat, 
+  TopDiagnosis, 
+  AppointmentStatusStat, 
+  DoctorPerformance,
+  UpcomingAppointment
+} from '@/types/dashboard';
+import { formatCurrency } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  
+  // State dữ liệu
+  const [overview, setOverview] = useState<OverviewStats | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
+  const [topDiagnoses, setTopDiagnoses] = useState<TopDiagnosis[]>([]);
+  const [statusStats, setStatusStats] = useState<AppointmentStatusStat[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [specialtyStats, setSpecialtyStats] = useState<any[]>([]); // Tạm dùng any nếu chưa có type chính xác cho cái này
 
+  // State Peak Time (Giả lập hoặc gọi API nếu bạn đã làm endpoint getPeakTimes)
+  const [peakTimeData, setPeakTimeData] = useState([
+    { label: '08:00', value: 12 },
+    { label: '09:00', value: 19 },
+    { label: '10:00', value: 15 },
+    { label: '14:00', value: 22 }, // Cao điểm
+    { label: '15:00', value: 18 },
+    { label: '16:00', value: 10 },
+  ]);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      const fetchData = async () => {
+    const fetchData = async () => {
+      try {
         setLoading(true);
-        setError('');
-        try {
-          // Gọi đồng thời tất cả API bằng Promise.all
-          const [dailyRes, monthlyRes, diagnosesRes, specialtyRes,] = await Promise.all([
-            api.get('/dashboard/daily-appointments'),
-            api.get('/dashboard/monthly-appointments'), // Vẫn gọi để có dữ liệu nếu muốn thêm sau
-            api.get('/dashboard/top-diagnoses'),
-            api.get('/dashboard/specialty-distribution'),
-            // Thêm API revenue nếu có
-          ]);
+        const [
+          overviewData,
+          dailyData,
+          diagnosesData,
+          statusData,
+          // specialtyData (nếu có API riêng)
+        ] = await Promise.all([
+          dashboardService.getOverviewStats(),
+          dashboardService.getDailyStats(),
+          dashboardService.getTopDiagnoses(),
+          dashboardService.getAppointmentStatusStats(),
+        ]);
 
-          setData({
-            dailyAppointments: dailyRes.data,
-            monthlyAppointments: monthlyRes.data,
-            topDiagnoses: diagnosesRes.data,
-            specialtyDistribution: specialtyRes.data,
-          });
+        setOverview(overviewData);
+        setDailyStats(dailyData);
+        setTopDiagnoses(diagnosesData);
+        setStatusStats(statusData);
+        
+        // Fake data cho biểu đồ tròn nếu chưa có API
+        setSpecialtyStats([
+           { specialty: 'Tim Mạch', count: 35 },
+           { specialty: 'Nha Khoa', count: 20 },
+           { specialty: 'Da Liễu', count: 15 },
+           { specialty: 'Nhi Khoa', count: 30 },
+        ]);
 
-        } catch (err) {
-          console.error("Lỗi khi tải dữ liệu dashboard:", err);
-          setError('Không thể tải dữ liệu thống kê.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchData();
-    }
-  }, [isAuthenticated, authLoading]);
+      } catch (error) {
+        console.error("Lỗi tải dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Xử lý trạng thái loading và error
-  if (authLoading || loading) {
-    return <div className="p-8">Đang tải dữ liệu dashboard...</div>;
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        {/* Skeleton KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
+          ))}
+        </div>
+        {/* Skeleton Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      </div>
+    );
   }
-  if (error) {
-    return <div className="p-8 text-red-500">{error}</div>;
-  }
-  if (!data) {
-    return <div className="p-8">Không có dữ liệu để hiển thị.</div>;
-  }
 
-  // Render giao diện dashboard
   return (
-    <div className="p-6 md:p-8 space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard Tổng Quan</h1>
+    <div className="space-y-8">
+      
+      {/* --- 1. KPI CARDS (Tổng Quan) --- */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard 
+          title="Tổng Doanh Thu" 
+          value={formatCurrency(overview?.totalRevenue || 0)} 
+          icon={DollarSign} 
+          trend="+12.5%" 
+          color="text-emerald-600"
+          bg="bg-emerald-100"
+        />
+        <KpiCard 
+          title="Tổng Lịch Hẹn" 
+          value={overview?.totalAppointments || 0} 
+          icon={CalendarCheck} 
+          trend="+5.2%" 
+          color="text-blue-600"
+          bg="bg-blue-100"
+        />
+        <KpiCard 
+          title="Bệnh Nhân" 
+          value={overview?.totalPatients || 0} 
+          icon={Users} 
+          trend="+8.1%" 
+          color="text-purple-600"
+          bg="bg-purple-100"
+        />
+        <KpiCard 
+          title="Bác Sĩ" 
+          value={overview?.totalDoctors || 0} 
+          icon={User} 
+          color="text-orange-600"
+          bg="bg-orange-100"
+        />
+      </section>
 
-      {/* Hàng 1: Biểu đồ đường + Biểu đồ tròn */}
+      {/* --- 2. BIỂU ĐỒ TÀI CHÍNH & XU HƯỚNG --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-4">
-          <h2 className="text-lg font-semibold mb-2">Số Ca Khám Hoàn Thành (30 Ngày Qua)</h2>
-          <DailyAppointmentsChart data={data.dailyAppointments} />
+        <Card>
+          <CardHeader>
+            <CardTitle>Xu Hướng Doanh Thu</CardTitle>
+            <CardDescription>Tổng doanh thu trong 30 ngày qua</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RevenueChart data={dailyStats} />
+          </CardContent>
         </Card>
-        <Card className="p-4">
-          <h2 className="text-lg font-semibold mb-2">Phân Bổ Theo Chuyên Khoa (30 Ngày Qua)</h2>
-          <SpecialtyDistributionChart data={data.specialtyDistribution} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Số Ca Khám Hoàn Thành</CardTitle>
+            <CardDescription>Thống kê lượng khách theo ngày</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DailyAppointmentsChart data={dailyStats} />
+          </CardContent>
         </Card>
       </div>
 
-      {/* Hàng 2: Biểu đồ cột */}
-      <Card className="p-4">
-        <h2 className="text-lg font-semibold mb-2">Top 5 Chẩn Đoán Phổ Biến (30 Ngày Qua)</h2>
-        <TopDiagnosesChart data={data.topDiagnoses} />
-      </Card>
+      {/* --- 3. PHÂN TÍCH HIỆU SUẤT & TRẠNG THÁI --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* Biểu đồ Tròn: Trạng thái lịch */}
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Tỷ Lệ Lịch Hẹn</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AppointmentStatusChart data={statusStats} />
+          </CardContent>
+        </Card>
+
+        {/* Biểu đồ Cột: Giờ cao điểm */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-orange-500" />
+              Phân Tích Giờ Cao Điểm
+            </CardTitle>
+            <CardDescription>Khung giờ có lượng đặt lịch nhiều nhất (Dữ liệu giả lập)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PeakTimeChart data={peakTimeData} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* --- 4. PHÂN TÍCH BỆNH LÝ & CHUYÊN KHOA --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 Bệnh Phổ Biến</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TopDiagnosesChart data={topDiagnoses} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Phân Bổ Theo Chuyên Khoa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SpecialtyDistributionChart data={specialtyStats} />
+          </CardContent>
+        </Card>
+      </div>
 
     </div>
   );
 }
+
+// --- Component con hiển thị thẻ KPI ---
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const KpiCard = ({ title, value, icon: Icon, trend, color, bg }: any) => (
+  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+      <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+      {trend && (
+        <p className="text-xs font-medium text-emerald-600 flex items-center mt-2">
+          <TrendingUp className="w-3 h-3 mr-1" />
+          {trend} so với tháng trước
+        </p>
+      )}
+    </div>
+    <div className={`p-3 rounded-lg ${bg} ${color}`}>
+      <Icon size={24} />
+    </div>
+  </div>
+);

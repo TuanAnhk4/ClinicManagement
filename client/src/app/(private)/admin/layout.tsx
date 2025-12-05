@@ -1,58 +1,43 @@
-// src/app/admin/layout.tsx
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
-import { useAuth } from '@/contexts/AuthContext';
-// Import Sidebar riêng cho Admin nếu có, hoặc Layout chung rồi tùy chỉnh
-import { Layout } from '@/components/layout/Layout'; // Layout chung
-import { AdminHeader } from '@/components/layout/AdminHeader'; // <-- Import AdminHeader
-import { AdminSidebar } from '@/components/layout/AdminSidebar'; // <-- Import AdminSidebar (nếu có)
-import { UserRole } from '@/types';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks'; // Dùng hook chuẩn
+import { Spinner } from '@/components/ui/Spinner';
+import { AdminLayout } from '@/components/layout/admin/AdminLayout'; // Dùng component Layout đã đóng gói
+import { UserRole } from '@/types/enums'; // Import Enum
 
-// Hàm lấy tiêu đề trang dựa trên đường dẫn
-const getPageTitle = (pathname: string): string => {
-  if (pathname.includes('/admin/users')) return 'Quản lý Người Dùng';
-  if (pathname.includes('/admin/dashboard')) return 'Dashboard Tổng Quan';
-  // Thêm các trang khác
-  return 'Trang Quản Trị'; // Default
-};
-
-
-export default function PrivateAdminLayout({ // Đổi tên để rõ ràng hơn
+export default function AdminRootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Hook để lấy đường dẫn hiện tại
-  const pageTitle = getPageTitle(pathname); // Lấy tiêu đề động
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace('/login');
-      return;
+    // Nếu đã tải xong mà chưa đăng nhập hoặc không phải Admin -> Đá ra ngoài
+    if (!loading) {
+      if (!isAuthenticated) {
+        router.replace('/login');
+      } else if (user?.role !== UserRole.ADMIN) {
+        router.replace('/'); // Hoặc trang 403 Forbidden
+      }
     }
-    if (!authLoading && user?.role !== UserRole.ADMIN) {
-      router.replace('/');
-    }
-  }, [isAuthenticated, user, authLoading, router]);
+  }, [isAuthenticated, user, loading, router]);
 
-  if (authLoading || !isAuthenticated || user?.role !== UserRole.ADMIN) {
-    return <div>Authenticating...</div>;
+  // Màn hình chờ khi đang check quyền
+  if (loading || !isAuthenticated || user?.role !== UserRole.ADMIN) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner size="large" />
+          <p className="text-sm text-gray-500 animate-pulse">Kiểm tra quyền quản trị...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Render Layout Admin với Header và Sidebar riêng (hoặc tùy chỉnh Layout chung)
-  return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden"> {/* Thêm overflow-hidden */}
-      <AdminSidebar /> {/* <-- 2. Sử dụng Sidebar của Admin */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader pageTitle={pageTitle} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  // Nếu đúng là Admin -> Render Layout Admin
+  return <AdminLayout>{children}</AdminLayout>;
 }

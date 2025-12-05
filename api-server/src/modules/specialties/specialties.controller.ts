@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, Post } from '@nestjs/common';
 
 import { RolesGuard } from '@common/guards';
 import { Roles, Public } from '@common/decorators';
@@ -13,6 +13,7 @@ import { UserRole } from '@modules/users/enums';
 export class SpecialtiesController {
   constructor(private readonly specialtiesService: SpecialtiesService) {}
 
+  @Post()
   @Roles(UserRole.ADMIN)
   async create(@Body() createSpecialtyDto: CreateSpecialtyDto): Promise<SpecialtyResponseDto> {
     const specialty = await this.specialtiesService.create(createSpecialtyDto);

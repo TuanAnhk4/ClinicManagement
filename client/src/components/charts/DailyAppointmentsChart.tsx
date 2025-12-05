@@ -1,5 +1,5 @@
-// src/components/charts/DailyAppointmentsChart.tsx
 'use client';
+
 import React from 'react';
 import {
   LineChart,
@@ -8,38 +8,89 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
-
-// Định nghĩa kiểu dữ liệu cho props
-interface ChartData {
-  date: string;
-  count: number;
-}
+import { DailyStat } from '@/types/dashboard';
+import { format, parseISO } from 'date-fns';
 
 interface DailyAppointmentsChartProps {
-  data: ChartData[];
+  data: DailyStat[];
 }
 
-export const DailyAppointmentsChart: React.FC<DailyAppointmentsChartProps> = ({ data }) => {
+// --- SỬA LỖI TẠI ĐÂY ---
+// Thay vì dùng TooltipProps<number, string> (dễ lỗi), ta dùng 'any' 
+// Đây là cách xử lý tiêu chuẩn (standard workaround) cho Recharts Custom Tooltip
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg text-sm">
+        <p className="font-semibold text-gray-700 mb-1">
+          {/* Format ngày: 2025-10-26 -> 26/10/2025 */}
+          {label ? format(parseISO(label), 'dd/MM/yyyy') : ''}
+        </p>
+        <p className="text-blue-600 font-medium">
+          Số ca khám: {payload[0].value}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+// -----------------------
+
+export const DailyAppointmentsChart = ({ data }: DailyAppointmentsChartProps) => {
   if (!data || data.length === 0) {
-    return <div className="text-center text-gray-500 py-8">Không có dữ liệu số ca khám hàng ngày.</div>;
+    return (
+      <div className="flex items-center justify-center h-[300px] text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+        Chưa có dữ liệu thống kê.
+      </div>
+    );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart
-        data={data}
-        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis allowDecimals={false}/>
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="count" stroke="#8884d8" name="Số ca khám" activeDot={{ r: 8 }} />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="w-full h-[350px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={data}
+          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+          
+          <XAxis 
+            dataKey="date" 
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#6b7280', fontSize: 12 }}
+            dy={10}
+            tickFormatter={(str) => {
+              try {
+                return format(parseISO(str), 'dd/MM');
+              } catch {
+                return str;
+              }
+            }}
+          />
+          
+          <YAxis 
+            allowDecimals={false}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#6b7280', fontSize: 12 }}
+          />
+          
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#9ca3af', strokeWidth: 1, strokeDasharray: '3 3' }} />
+          
+          <Line 
+            type="monotone" 
+            dataKey="count" 
+            stroke="#2563eb" 
+            strokeWidth={3}
+            dot={{ r: 4, fill: '#2563eb', strokeWidth: 0 }}
+            activeDot={{ r: 6, strokeWidth: 0 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 };

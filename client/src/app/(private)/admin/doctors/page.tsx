@@ -1,139 +1,225 @@
-// src/app/admin/doctors/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import { Table } from '@/components/ui/Table';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ColumnDef } from '@tanstack/react-table';
+import { Plus, Pencil, Trash2, Search, Stethoscope } from 'lucide-react';
+
+// Components
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Table } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
-import { UserForm } from '@/components/UserForm'; // Tái sử dụng UserForm
-import { createColumnHelper, ColumnDef } from '@tanstack/react-table';
-import { User, UserRole } from '@/types'; // Import User và UserRole từ types chung
+import { Spinner } from '@/components/ui/Spinner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { UserForm } from '@/components/forms/user/UserForm';
 
-const columnHelper = createColumnHelper<User>();
+// Services & Types & Hooks
+import { userService } from '@/services/user.service';
+import { User } from '@/types/users';
+import { UserRole } from '@/types/enums';
+import { useToast } from '@/hooks';
 
-export default function DoctorManagementPage() {
-  const [doctors, setDoctors] = useState<User[]>([]); // State lưu danh sách bác sĩ
+export default function AdminDoctorsPage() {
+  const [data, setData] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // State quản lý Modal
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDoctor, setEditingDoctor] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Hàm lấy danh sách bác sĩ từ API
-  const fetchDoctors = async () => {
+  const { success, error: toastError } = useToast();
+
+  // 1. Tải danh sách bác sĩ
+  const fetchData = async () => {
     try {
       setLoading(true);
-      setError('');
-      const response = await api.get('/users', {
-        params: { role: UserRole.DOCTOR }, // Lọc theo vai trò Bác sĩ
-      });
-      setDoctors(response.data);
-    } catch (err) {
-      console.error('Lỗi khi tải danh sách bác sĩ:', err);
-      setError('Không thể tải danh sách bác sĩ. Vui lòng thử lại.');
+      // Gọi service lấy danh sách user có role=DOCTOR
+      const result = await userService.getAll({ role: UserRole.DOCTOR });
+      setData(result);
+    } catch (error) {
+      console.error(error);
+      toastError('Không thể tải danh sách bác sĩ.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Gọi hàm fetchDoctors khi component được render lần đầu
   useEffect(() => {
-    fetchDoctors();
+    fetchData();
   }, []);
 
-  // Hàm xử lý khi nhấn nút Xóa
-  const handleDelete = async (userId: number) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa bác sĩ này?')) {
+  // 2. Cấu hình cột cho bảng
+  const columns = useMemo<ColumnDef<User>[]>(
+    () => [
+      {
+        accessorKey: 'id',
+        header: 'ID',
+        cell: (info) => <span className="font-mono text-gray-500 text-xs">#{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'fullName',
+        header: 'Họ và Tên',
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={`https://ui-avatars.com/api/?name=${user.fullName}&background=0D8ABC&color=fff`} />
+                <AvatarFallback>{user.fullName.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-medium text-gray-900">{user.fullName}</div>
+                <div className="text-xs text-gray-500">{user.email}</div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'specialty', // Giả sử backend trả về object specialty
+        header: 'Chuyên Khoa',
+        cell: ({ row }) => {
+          const specialtyName = row.original.specialty?.name;
+          return specialtyName ? (
+            <Badge variant="primary" className="bg-blue-50 text-blue-700 font-normal">
+              <Stethoscope size={12} className="mr-1" />
+              {specialtyName}
+            </Badge>
+          ) : (
+            <span className="text-gray-400 text-xs italic">Chưa cập nhật</span>
+          );
+        },
+      },
+      {
+        accessorKey: 'phoneNumber',
+        header: 'SĐT',
+        cell: (info) => <span className="text-gray-600 text-sm">{info.getValue() as string || '-'}</span>,
+      },
+      {
+        id: 'actions',
+        header: 'Hành động',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="small" 
+              onClick={() => handleEdit(row.original)}
+              title="Sửa thông tin"
+            >
+              <Pencil size={16} className="text-blue-600" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="small" 
+              onClick={() => handleDelete(row.original.id)}
+              title="Xóa bác sĩ"
+            >
+              <Trash2 size={16} className="text-red-600" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
+  // 3. Lọc dữ liệu (Client-side Search)
+  const filteredData = useMemo(() => {
+    if (!searchTerm) return data;
+    return data.filter((user) =>
+      user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [data, searchTerm]);
+
+  // 4. Handlers
+  const handleCreate = () => {
+    setEditingUser(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn xóa bác sĩ này? Hành động này không thể hoàn tác.')) {
       try {
-        await api.delete(`/users/${userId}`);
-        fetchDoctors(); // Tải lại danh sách sau khi xóa thành công
-      } catch (err) {
-        console.error('Lỗi khi xóa bác sĩ:', err);
-        alert('Xóa bác sĩ thất bại.');
+        await userService.delete(id);
+        success('Đã xóa bác sĩ thành công.');
+        fetchData();
+      } catch (error) {
+        toastError('Xóa thất bại.');
       }
     }
   };
 
-  // Hàm xử lý khi nhấn nút Sửa
-  const handleEdit = (doctor: User) => {
-    setEditingDoctor(doctor); // Lưu thông tin bác sĩ cần sửa
-    setIsModalOpen(true); // Mở modal
+  const handleSaveSuccess = () => {
+    setIsModalOpen(false);
+    fetchData();
   };
 
-  // Hàm xử lý khi nhấn nút Thêm Mới
-  const handleAddNew = () => {
-    setEditingDoctor(null); // Đặt là null để UserForm biết là thêm mới
-    setIsModalOpen(true); // Mở modal
-  };
-
-  // Định nghĩa các cột cho bảng
-  const columns = [
-    columnHelper.accessor('id', { header: 'ID' }),
-    columnHelper.accessor('fullName', {
-      header: 'Họ và Tên',
-      cell: info => ( // Hiển thị kèm Avatar nếu muốn
-        <div className="flex items-center space-x-3">
-          <div className="avatar placeholder">
-             <div className="bg-neutral-focus text-neutral-content rounded-full w-8 h-8">
-               <span className="text-xs">{info.getValue().charAt(0)}</span>
-             </div>
-          </div>
-          <span>{info.getValue()}</span>
-        </div>
-      )
-    }),
-    columnHelper.accessor('email', { header: 'Email' }),
-    // Có thể thêm cột Chuyên khoa nếu User type và API trả về
-    // columnHelper.accessor('specialty.name', { header: 'Chuyên Khoa'}),
-    columnHelper.display({
-      id: 'actions',
-      header: 'Hành động',
-      cell: (props) => (
-        <div className="flex space-x-2">
-          <Button size="small" variant="secondary" onClick={() => handleEdit(props.row.original)}>
-            Sửa
-          </Button>
-          <Button size="small" variant="danger" onClick={() => handleDelete(props.row.original.id)}>
-            Xóa
-          </Button>
-        </div>
-      ),
-    }),
-  ] as ColumnDef<User, unknown>[]; // Dùng unknown thay vì any
-
-  // Xử lý giao diện khi đang tải hoặc có lỗi
-  if (loading) return <p className="p-6">Đang tải danh sách bác sĩ...</p>;
-  if (error) return <p className="p-6 text-red-500">{error}</p>;
-
-  // Giao diện chính của trang
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Quản lý Bác Sĩ</h1>
-        <Button onClick={handleAddNew}>+ Thêm Bác Sĩ Mới</Button>
-      </div>
-      <div className="p-4 bg-white rounded-lg shadow">
-        <Table columns={columns} data={doctors} />
+    <div className="space-y-6">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Bác Sĩ</h1>
+          <p className="text-sm text-gray-500">Danh sách đội ngũ y bác sĩ của phòng khám.</p>
+        </div>
+        <Button onClick={handleCreate} className="flex items-center gap-2 shadow-lg shadow-blue-200">
+          <Plus size={18} /> Thêm Bác Sĩ
+        </Button>
       </div>
 
-      {/* Modal để Thêm/Sửa Bác Sĩ */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        {/*
-          UserForm cần được cập nhật để có thể nhận một prop `defaultRole`
-          để khi thêm mới, nó sẽ mặc định vai trò là DOCTOR.
-        */}
-        <UserForm
-          initialData={editingDoctor}
-          onSave={() => {
-            setIsModalOpen(false); // Đóng modal
-            fetchDoctors(); // Tải lại danh sách
-          }}
-          onCancel={() => setIsModalOpen(false)} // Đóng modal khi nhấn Hủy
-          // defaultRole={UserRole.DOCTOR} // Truyền vai trò mặc định (cần cập nhật UserForm)
+      {/* Toolbar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input 
+            placeholder="Tìm kiếm theo tên, email..." 
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Spinner size="large" />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <Table 
+            data={filteredData} 
+            columns={columns} 
+            pageSize={10}
+          />
+        </div>
+      )}
+
+      {/* Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingUser ? 'Cập Nhật Thông Tin Bác Sĩ' : 'Thêm Bác Sĩ Mới'}
+        size="lg"
+      >
+        <UserForm 
+          initialData={editingUser}
+          onSave={handleSaveSuccess}
+          onCancel={() => setIsModalOpen(false)}
+          // Gợi ý: Bạn có thể sửa UserForm để nhận prop 'defaultRole'
+          // nếu muốn form tự động chọn Role DOCTOR khi mở từ trang này.
         />
       </Modal>
+
     </div>
   );
 }
